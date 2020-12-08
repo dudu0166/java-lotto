@@ -1,50 +1,58 @@
 package lotto.controller;
 
 import lotto.model.*;
+import lotto.model.lotto.*;
 import lotto.strategy.ManualStrategy;
 import lotto.view.InputView;
 import lotto.view.ResultView;
+import util.StringUtils;
 
 import java.util.*;
+import java.util.stream.Collectors;
 
 public class LottoController {
 
-    private InputView inputView = new InputView();
-    private ResultView resultView = new ResultView();
     private Amount amount;
+    private LottoPrice lottoPrice;
     private Lottoes lottoes;
-    private Lotto winningLotto;
+    private WinningLotto winningLotto;
 
     public void run() {
-
-        String inputAmount = inputView.printInputMessageNGetAmount();
+        String inputAmount = InputView.printInputMessageNGetAmount();
         amount = new Amount(inputAmount);
 
-        buyLottoes();
+        String manualCount = InputView.printInputManualLottoCountMessageNGetCount();
+        lottoPrice = new LottoPrice(amount.getPrePurchaseAmount(0, Lotto.PRICE), manualCount);
 
-        String inputWinnerNumber = inputView.printInputMessageNGetWinnerNumbers();
-        winningLotto = new WinningLotto(new ManualStrategy(inputWinnerNumber));
+        List<String> userInputs = InputView.printInputManualLottoesMessageNGetUserInput(Integer.valueOf(manualCount));
+        buyLottoes(userInputs);
+
+        String inputWinnerNumber = InputView.printInputMessageNGetWinnerNumbers();
+        String inputBonusNumber = InputView.printInputMessageNGetBonusNumbers();
+
+        winningLotto = new WinningLotto(
+                LottoNumber.of(StringUtils.stringToInt(inputBonusNumber)),
+                new ManualStrategy(inputWinnerNumber)
+        );
 
         lottery();
     }
 
-    private void buyLottoes() {
-        lottoes = new Lottoes(amount.getPrePurchaseAmount(0, Lotto.PRICE));
-        amount.pay(lottoes.getLottoCount() * Lotto.PRICE);
-        resultView.printBuyMessage(lottoes.getLottoCount());
-        resultView.printLottoes(lottoes.getLottoes());
+    private void buyLottoes(List<String> userInputs) {
+        lottoes = new Lottoes(lottoPrice.autoPrice(), userInputs);
+        amount.pay(lottoPrice.manualPrice());
+        amount.pay(lottoPrice.autoPrice());
+
+        ResultView.printMessage(lottoPrice.toString());
+        ResultView.printMessage(lottoes.toString());
     }
 
     private void lottery() {
-        int lottoCount = lottoes.getLottoCount();
-        int prePurchaseAmount = amount.getPrePurchaseAmount(lottoCount, Lotto.PRICE);
+        Map<Hit, Integer> winnerNumbers = winningLotto.matches(lottoes);
+        double earningRate = winningLotto.earningRate(lottoes, lottoPrice);
 
-        List<SortedSet<Integer>> lottoesNumbers = lottoes.getLottoes();
-        Map<Hit, Integer> winnerNumbers = ((WinningLotto) winningLotto).getResult(lottoesNumbers);
-        double earningRate = ((WinningLotto) winningLotto).getEarningRate(prePurchaseAmount, lottoesNumbers);
-
-        resultView.printResult(winnerNumbers);
-        resultView.printEarningRate(earningRate);
+        ResultView.printResult(winnerNumbers);
+        ResultView.printEarningRate(earningRate);
     }
 
 }
